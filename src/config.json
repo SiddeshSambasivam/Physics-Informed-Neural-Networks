@@ -1,0 +1,9 @@
+{
+    "data_path": "../Data/burgers_shock.mat",
+    "n_u": [20, 40, 60, 80, 100, 200],
+    "n_f": [2000, 4000, 6000, 7000, 8000, 10000],
+    "num_neurons": [10, 20, 40],
+    "num_layers": [2, 4, 6, 8],
+    "num_activation": ["Tanh", "Sigmoid", "ReLU"],
+    "epochs": [50, 100, 150, 200]
+}
