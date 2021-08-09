@@ -6,9 +6,6 @@ This repository provides a PyTorch implementation of the physics informed neural
 <img src='./assets/model_prediction.png' 
 />
 </p>
-<p align="center">
-<i>Reproduced experimental results</i>
-<p>
 
 <h3 style="font-weight:bold">Experiment setup</h3>
 
