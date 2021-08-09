@@ -2,7 +2,6 @@ import torch
 import torch.nn as nn
 from collections import OrderedDict
 
-
 class PhysicsINN(nn.Module):
     def __init__(
         self, num_layers: int = 2, num_neurons: int = 20, activation_fn: str = "tanh"
@@ -79,6 +78,4 @@ class PhysicsINN(nn.Module):
         out = self.net(inputs)
 
         return out
-
-
-# model = PhysicsINN(4, 40, "Tanh")
+        

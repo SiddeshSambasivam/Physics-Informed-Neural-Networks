@@ -1,4 +1,4 @@
-import os
+from typing import List
 from datetime import datetime
 from itertools import product
 
@@ -7,27 +7,47 @@ import scipy.io
 import numpy as np
 import pandas as pd
 
-import torch
-import torch.nn as nn
-import torch.nn.functional as F
-
 from tqdm import trange
 
 from pylab import meshgrid
-from matplotlib import pyplot as plt
 
 from model import PhysicsINN
 from argparser import get_parser
 from utils import read_config
 
 
-def prepare_data(data_path: str, n_u: int, n_f: int) -> list:
+def get_IC_BC(data_points: np.ndarray, solutions) -> List[np.ndarray]:
     """
-    Creates a list of training data and labels.
-    Converts them to tensors and returns them as a list.
+    Returns the IC and BC from the given data points.
     """
 
-    data_dict = scipy.io.loadmat(data_path)
+    IC_X, IC_Y = list(), list()  # Initial and boundary points
+    CC_X, CC_Y = list(), list()  # Collocation points
+
+    for idx, sample in enumerate(data_points):
+
+        t, x = sample
+        if t in [0, 1] or x in [-1, 1]:
+            IC_X.append(sample)
+            IC_Y.append(solutions[idx])
+        else:
+            CC_X.append(sample)
+            CC_Y.append(solutions[idx])
+
+    IC_X = np.array(IC_X)
+    IC_Y = np.array(IC_Y)
+
+    CC_X = np.array(CC_X)
+    CC_Y = np.array(CC_Y)
+
+    return IC_X, IC_Y, CC_X, CC_Y
+
+
+def get_data(path: str) -> List[np.ndarray]:
+    """
+    Reads the data from the given path.
+    """
+    data_dict = scipy.io.loadmat(path)
     x_data, t_data, u_data = data_dict["x"], data_dict["t"], data_dict["usol"]
 
     u_t, u_x = meshgrid(t_data, x_data)
@@ -37,24 +57,19 @@ def prepare_data(data_path: str, n_u: int, n_f: int) -> list:
         (u_t.flatten()[:, None], u_x.flatten()[:, None])
     )  # (25600, 2)
 
-    IC_X, IC_Y = list(), list()  # Initial and boundary points
-    CC_X, CC_Y = list(), list()  # Collocation points
+    return training_points, u_data_transformed
 
-    for idx, sample in enumerate(training_points):
 
-        t, x = sample
-        if t in [0, 1] or x in [-1, 1]:
-            IC_X.append(sample)
-            IC_Y.append(u_data_transformed[idx])
-        else:
-            CC_X.append(sample)
-            CC_Y.append(u_data_transformed[idx])
+def get_training_data(data_path: str, n_u: int, n_f: int) -> list:
+    """
+    Creates a list of training data and labels.
+    Converts them to tensors and returns them as a list.
+    """
 
-    IC_X = np.array(IC_X)
-    IC_Y = np.array(IC_Y)
+    # Create training data
+    data_points, solutions = get_data(data_path)
 
-    CC_X = np.array(CC_X)
-    CC_Y = np.array(CC_Y)
+    IC_X, IC_Y, CC_X, CC_Y = get_IC_BC(data_points, solutions)
 
     n_u_idx = list(np.random.choice(len(IC_X), n_u))
     n_f_idx = list(np.random.choice(len(CC_X), n_f))
@@ -75,7 +90,13 @@ def prepare_data(data_path: str, n_u: int, n_f: int) -> list:
 
 
 def trainer(
-    train_x, train_t, train_u, epochs, num_neurons, num_layers, activation_fn
+    train_x: torch.tensor,
+    train_t: torch.tensor,
+    train_u: torch.tensor,
+    epochs: int,
+    num_neurons: int,
+    num_layers: int,
+    activation_fn,
 ) -> list:
 
     model = PhysicsINN(
@@ -88,7 +109,7 @@ def trainer(
 
     losses = list()
 
-    for epoch in t_bar:
+    for _ in t_bar:
 
         def closure():
             optimizer.zero_grad()
@@ -157,7 +178,7 @@ def run_from_args(
     Loads all the parameters from the CLI arguments.
     Prepares the data, runs the trainer loop and logs the experiment results.
     """
-    train_x, train_t, train_u = prepare_data(data_path, n_u, n_f)
+    train_x, train_t, train_u = get_training_data(data_path, n_u, n_f)
     losses = trainer(
         train_x, train_t, train_u, epochs, num_neurons, num_layers, activation_fn
     )
@@ -185,7 +206,7 @@ def run_from_config_file(config_path: str) -> None:
 
         (n_u_local, n_f_local) = exp_points[i]
 
-        train_x, train_t, train_u = prepare_data(
+        train_x, train_t, train_u = get_training_data(
             args["data_path"], n_u_local, n_f_local
         )
         print(f"Batch {i}: n_u={n_u_local}\tn_f={n_f_local}")
